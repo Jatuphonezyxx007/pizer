@@ -24,7 +24,7 @@ export class UsersService {
    * ค้นหา User ด้วย Email (ถูกเรียกโดย AuthService.validateUser)
    * เราต้องดึง "roles" มาด้วยเพื่อใช้ใน JWT
    */
-  async findOneByEmail(email: string): Promise<User | undefined> {
+  async findOneByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { email },
       relations: ['roles'], // <-- สำคัญ: ดึงข้อมูล roles มาพร้อมกัน

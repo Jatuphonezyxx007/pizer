@@ -16,7 +16,7 @@ export class OrderDetail {
   @Column({ type: 'bigint' })
   order_id: number;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'bigint', nullable: true })
   product_variant_id: number;
 
   @Column({ type: 'int' })

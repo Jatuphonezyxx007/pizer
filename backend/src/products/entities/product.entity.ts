@@ -29,7 +29,7 @@ export class Product {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0.0 })
   price: number;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'bigint', nullable: true })
   category_id: number;
 
   @CreateDateColumn({ type: 'datetime' })

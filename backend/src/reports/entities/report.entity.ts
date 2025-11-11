@@ -19,7 +19,7 @@ export class Report {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'bigint', nullable: true })
   generated_by_user_id: number; // Admin ที่สั่ง Generate
 
   @Column({ type: 'varchar', length: 255 })
