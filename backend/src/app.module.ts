@@ -6,6 +6,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ProductsModule } from './products/products.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -32,6 +35,12 @@ import { RolesModule } from './roles/roles.module';
     UsersModule,
 
     RolesModule,
+
+    CategoriesModule,
+
+    ProductsModule,
+
+    ReviewsModule,
 
     // --- สิ้นสุดส่วนที่เพิ่ม ---
   ],
