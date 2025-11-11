@@ -9,6 +9,18 @@ import { RolesModule } from './roles/roles.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { CartsModule } from './carts/carts.module';
+import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
+import { ShipmentsModule } from './shipments/shipments.module';
+import { RefundsModule } from './refunds/refunds.module';
+import { InvoicesModule } from './invoices/invoices.module';
+import { CouponsModule } from './coupons/coupons.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { SettingsModule } from './settings/settings.module';
+import { LogsModule } from './logs/logs.module';
+import { ReportsModule } from './reports/reports.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -41,6 +53,30 @@ import { ReviewsModule } from './reviews/reviews.module';
     ProductsModule,
 
     ReviewsModule,
+
+    CartsModule,
+
+    OrdersModule,
+
+    PaymentsModule,
+
+    ShipmentsModule,
+
+    RefundsModule,
+
+    InvoicesModule,
+
+    CouponsModule,
+
+    NotificationsModule,
+
+    SettingsModule,
+
+    LogsModule,
+
+    ReportsModule,
+
+    AuthModule,
 
     // --- สิ้นสุดส่วนที่เพิ่ม ---
   ],
