@@ -1,17 +1,15 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Home from "../views/Home.vue"; // <-- 1. Import หน้า Home
+
+// เราจะสร้างหน้าเหล่านี้ในขั้นตอนต่อไป
+// import Home from '../views/Home.vue'
+// import Login from '../views/Login.vue'
+// import Register from '../views/Register.vue'
 
 const routes = [
-  {
-    path: "/",
-    name: "Home",
-    component: Home, // <-- 2. ลงทะเบียนหน้า Home
-  },
-
-  // (เราจะสร้างหน้าเหล่านี้ทีหลัง)
-  // { path: '/login', name: 'Login', component: () => import('../views/Login.vue') },
-  // { path: '/register', name: 'Register', component: () => import('../views/Register.vue') },
-  // { path: '/products/:id', name: 'ProductDetail', component: () => import('../views/ProductDetail.vue') },
+  // { path: '/', name: 'Home', component: Home },
+  // { path: '/login', name: 'Login', component: Login },
+  // { path: '/register', name: 'Register', component: Register },
+  // (เราจะมาเพิ่มหน้าอื่นๆ ทีหลัง)
 ];
 
 const router = createRouter({
