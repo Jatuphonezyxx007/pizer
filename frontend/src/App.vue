@@ -1,22 +1,21 @@
 <script setup>
-import HelloWorld from "./components/HelloWorld.vue";
+import { RouterView } from "vue-router";
+// import NavBar from "./components/NavBar/NavBar.vue";
+// import Footer from "./components/Footer/Footer.vue"; // <-- Import Footer
 </script>
 
 <template>
-  <h1 class="text-3xl font-bold underline">Hello world!</h1>
+  <div class="flex flex-col min-h-screen bg-gray-100">
+    <!-- <NavBar /> -->
+
+    <main class="flex-grow container mx-auto p-6">
+      <RouterView />
+    </main>
+
+    <!-- <Footer /> -->
+  </div>
 </template>
 
 <style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
-}
+/* ลบ style เก่าทิ้งได้เลย */
 </style>
