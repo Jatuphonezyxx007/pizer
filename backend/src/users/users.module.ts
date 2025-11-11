@@ -5,6 +5,7 @@ import { InfoPersonal } from './entities/info-personal.entity'; // <-- Import �
 import { Address } from './entities/address.entity'; // <-- Import เพิ่ม
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
+import { RolesModule } from 'src/roles/roles.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { UsersController } from './users.controller';
       InfoPersonal, // <-- เพิ่ม
       Address, // <-- เพิ่ม
     ]),
+    RolesModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

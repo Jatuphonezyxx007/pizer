@@ -6,9 +6,12 @@ import {
   UpdateDateColumn,
   OneToOne,
   OneToMany,
+  ManyToMany,
+  JoinTable,
 } from 'typeorm';
 import { InfoPersonal } from './info-personal.entity'; // <-- Import เพิ่ม
 import { Address } from './address.entity'; // <-- Import เพิ่ม
+import { Role } from 'src/roles/entities/role.entity';
 
 // สร้าง Enum สำหรับ status
 export enum UserStatus {
@@ -51,4 +54,14 @@ export class User {
 
   @OneToMany(() => Address, (address) => address.user)
   addresses: Address[];
+
+  @ManyToMany(() => Role, (role) => role.users, {
+    cascade: true, // ทำให้บันทึก Role ใหม่พร้อม User ได้ (ถ้าจำเป็น)
+  })
+  @JoinTable({
+    name: 'user_roles', // <-- นี่คือตารางเชื่อมที่คุณต้องการ!
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' },
+  })
+  roles: Role[];
 }

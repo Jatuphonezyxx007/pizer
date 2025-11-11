@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'; // <-- Import เพิ่ม
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -29,6 +30,8 @@ import { UsersModule } from './users/users.module';
     }),
 
     UsersModule,
+
+    RolesModule,
 
     // --- สิ้นสุดส่วนที่เพิ่ม ---
   ],
