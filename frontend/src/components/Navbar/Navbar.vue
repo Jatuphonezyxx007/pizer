@@ -1,31 +1,40 @@
 <script setup>
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
+import { useAuthStore } from "../../stores/authStore"; // ⭐️ 1. Import Store
+
+const authStore = useAuthStore(); // ⭐️ 2. เรียกใช้ Store
+const router = useRouter(); // ⭐️ 3. เรียกใช้ Router (สำหรับ Logout)
+
+// ⭐️ 4. สร้างฟังก์ชัน Logout
+const handleLogout = () => {
+  authStore.logout();
+  router.push("/login"); // กลับไปหน้า Login
+};
 </script>
 
 <template>
   <header class="sticky top-0 z-50 text-white bg-[#ae2121]">
-    <!-- <div class="w-full text-xs border-b border-white/20">
-      <div class="container mx-auto px-6 py-1.5 flex justify-end items-center">
-        <RouterLink to="/register" class="font-semibold hover:opacity-80"
-          >สมัครใหม่</RouterLink
-        >
-        <div class="h-3 w-px bg-white/40"></div>
-        <RouterLink to="/login" class="font-semibold hover:opacity-80"
-          >เข้าสู่ระบบ</RouterLink
-        >
-      </div>
-    </div> -->
     <div class="w-full text-xs">
       <div class="container py-1.5 flex justify-end items-center space-x-4">
-        <RouterLink to="/register" class="font-semibold hover:opacity-80">
-          สมัครใหม่
-        </RouterLink>
+        <template v-if="!authStore.isAuthenticated">
+          <RouterLink to="/register" class="font-semibold hover:opacity-80">
+            สมัครใหม่
+          </RouterLink>
+          <div class="h-3 w-px bg-white/40"></div>
+          <RouterLink to="/login" class="font-semibold hover:opacity-80">
+            เข้าสู่ระบบ
+          </RouterLink>
+        </template>
 
-        <div class="h-3 w-px bg-white/40"></div>
-
-        <RouterLink to="/login" class="font-semibold hover:opacity-80">
-          เข้าสู่ระบบ
-        </RouterLink>
+        <template v-else>
+          <span class="font-semibold">
+            สวัสดี, {{ authStore.user.username }}
+          </span>
+          <div class="h-3 w-px bg-white/40"></div>
+          <button @click="handleLogout" class="font-semibold hover:opacity-80">
+            ออกจากระบบ
+          </button>
+        </template>
       </div>
     </div>
 
