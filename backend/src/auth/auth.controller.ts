@@ -8,8 +8,9 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { LocalAuthGuard } from './guards/local-auth.guard'; // <-- Import (1)
+// import { LocalAuthGuard } from './guards/local-auth.guard'; // <-- Import (1)
 import { JwtAuthGuard } from './guards/jwt-auth.guard'; // <-- Import (2)
+import { LoginUserDto } from './dto/login-user.dto';
 
 @Controller('auth') // API ทั้งหมดจะขึ้นต้นด้วย /api/v1/auth
 export class AuthController {
@@ -31,15 +32,13 @@ export class AuthController {
    * 2. API เข้าสู่ระบบ (Login)
    * (POST /api/v1/auth/login)
    */
-  @UseGuards(LocalAuthGuard) // <-- แปะป้าย! (1)
+  // @UseGuards(LocalAuthGuard) // <-- แปะป้าย! (1)
   @Post('login')
-  async login(@Request() req: any) {
-    // 1. @UseGuards(LocalAuthGuard) จะทำงานก่อน
-    // 2. มันจะเรียก LocalStrategy (ยาม)
-    // 3. ยามจะเรียก authService.validateUser(...)
-    // 4. ถ้าผ่าน ยามจะเอา 'user' (ที่ไม่มีรหัสผ่าน) มาแปะไว้ที่ req.user
-    // 5. AuthService.login จะถูกเรียก โดยใช้ข้อมูลจาก req.user
-    return this.authService.login(req.user);
+  async login(@Body() loginUserDto: LoginUserDto) {
+    // ⭐️ 4. รับ Body พร้อม DTO
+    // ValidationPipe จะตรวจสอบ DTO (รวม reCAPTCHA) ก่อน
+    // 5. ส่ง DTO ทั้งก้อนไปให้ AuthService
+    return this.authService.login(loginUserDto);
   }
 
   /**

@@ -2,48 +2,106 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  ForbiddenException, // <-- 1. Import
 } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { CreateUserDto } from 'src/users/dto/create-user.dto'; // เราจะใช้ DTO จาก Users
-import { User } from 'src/users/entities/user.entity';
+import { CreateUserDto } from 'src/users/dto/create-user.dto';
+import { HttpService } from '@nestjs/axios'; // <-- 2. Import
+import { ConfigService } from '@nestjs/config'; // <-- 3. Import
+import { firstValueFrom } from 'rxjs'; // <-- 4. Import
+import { LoginUserDto } from './dto/login-user.dto';
 
-// ... (imports) ...
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private readonly httpService: HttpService, // <-- 5. Inject
+    private readonly configService: ConfigService, // <-- 6. Inject
   ) {}
 
-  // ... (validateUser และ login method เหมือนเดิม) ...
-  async validateUser(email: string, pass: string): Promise<any> {
-    const user = await this.usersService.findOneByEmail(email);
-    if (!user) {
-      return null;
+  // --- ⭐️ เพิ่มฟังก์ชันสำหรับตรวจสอบ reCAPTCHA ⭐️ ---
+  private async verifyRecaptcha(token: string): Promise<boolean> {
+    const secretKey = this.configService.get<string>('RECAPTCHA_SECRET_KEY');
+    const url = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${token}`;
+
+    try {
+      const response = await firstValueFrom(this.httpService.post(url));
+      const { success, score } = response.data;
+
+      // สำหรับ v3 เราจะตรวจสอบ score ด้วย (เช่น ต้องมากกว่า 0.5)
+      // คุณสามารถปรับค่า 0.5 นี้ได้ตามความเหมาะสม
+      return success && score > 0.5;
+    } catch (error) {
+      console.error('reCAPTCHA verification failed:', error);
+      return false;
     }
+  }
+
+  // --- (validateUser และ login method เหมือนเดิม) ---
+  async validateUser(identifier: string, pass: string): Promise<any> {
+    // ⭐️ 2. แก้ไข: ใช้ method ใหม่
+    const user = await this.usersService.findOneByIdentifier(identifier);
+    if (!user) {
+      return null; // ไม่พบผู้ใช้
+    }
+
+    // ⭐️ 3. ตรวจสอบรหัสผ่าน (เหมือนเดิม)
     const isMatch = await bcrypt.compare(pass, user.password);
     if (isMatch) {
       const { password, ...result } = user;
       return result;
     }
-    return null;
+    return null; // รหัสผ่านไม่ตรง
   }
-  async login(user: any) {
+  /**
+   * 2. ล็อกอิน (อัปเกรดแล้ว)
+   * รับ DTO, ตรวจสอบ reCAPTCHA, ตรวจสอบ user, แล้วค่อยสร้าง Token
+   */
+  async login(loginUserDto: LoginUserDto) {
+    // ⭐️ 4. แก้ไข: รับ DTO
+    // ⭐️ 5. (เพิ่ม) ตรวจสอบ reCAPTCHA ก่อน
+    const isHuman = await this.verifyRecaptcha(loginUserDto.recaptchaToken);
+    if (!isHuman) {
+      throw new ForbiddenException('reCAPTCHA verification failed.');
+    }
+
+    // ⭐️ 6. (ย้าย) ตรวจสอบ User
+    const user = await this.validateUser(
+      loginUserDto.identifier,
+      loginUserDto.password,
+    );
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials'); // 401
+    }
+
+    // ⭐️ 7. (ย้าย) สร้าง Token
     const payload = {
       username: user.username,
       sub: user.id,
       roles: user.roles,
     };
+
     return {
       access_token: this.jwtService.sign(payload),
     };
   }
+
   /**
    * 3. สมัครสมาชิก (อัปเกรดแล้ว)
    */
   async register(createUserDto: CreateUserDto) {
+    // ⭐️ 3.0 (เพิ่ม) ตรวจสอบ reCAPTCHA ก่อน!!
+    const isHuman = await this.verifyRecaptcha(createUserDto.recaptchaToken);
+    if (!isHuman) {
+      throw new ForbiddenException(
+        'reCAPTCHA verification failed. Are you a robot?',
+      );
+    }
+
     // 3.1 ตรวจสอบ Email ซ้ำ
     const existingUser = await this.usersService.findOneByEmail(
       createUserDto.email,
@@ -52,7 +110,7 @@ export class AuthService {
       throw new ConflictException('Email already exists');
     }
 
-    // ⭐️ 3.2 (เพิ่ม) ตรวจสอบเบอร์โทรซ้ำ (ถ้ามีการส่งเบอร์มา)
+    // 3.2 (เพิ่ม) ตรวจสอบเบอร์โทรซ้ำ (ถ้ามีการส่งเบอร์มา)
     if (createUserDto.phone) {
       const existingPhone = await this.usersService.findOneByPhone(
         createUserDto.phone,
@@ -62,28 +120,29 @@ export class AuthService {
       }
     }
 
-    // (Username จะถูกตรวจสอบโดยอัตโนมัติที่ระดับ DB เพราะเราตั้ง UNIQUE ไว้)
+    // 3.3 ลบ recaptchaToken ออกจาก DTO ก่อนส่งไปสร้าง user
+    // const { recaptchaToken, ...userData } = createUserDto;
 
-    // 3.3 Hash รหัสผ่าน
+    // 3.4 Hash รหัสผ่าน
     const saltOrRounds = 10;
     const hashedPassword = await bcrypt.hash(
       createUserDto.password,
       saltOrRounds,
     );
 
-    // 3.4 สร้าง User object ใหม่
+    // 3.5 สร้าง User object ใหม่
     const userToCreate = {
       ...createUserDto,
       password: hashedPassword,
     };
 
-    // 3.5 บันทึกลงฐานข้อมูล (ส่ง DTO ทั้งก้อนไปให้ UsersService)
+    // 3.6 บันทึกลงฐานข้อมูล
     try {
       const createdUser = await this.usersService.create(userToCreate);
       const { password, ...result } = createdUser;
       return result;
     } catch (error) {
-      // 3.6 (อัปเกรด) ตรวจจับ Error จาก DB (เช่น Username ซ้ำ)
+      // 3.7 (อัปเกรด) ตรวจจับ Error จาก DB (เช่น Username ซ้ำ)
       if (error.code === 'ER_DUP_ENTRY') {
         if (error.message.includes('username')) {
           throw new ConflictException('Username already exists');

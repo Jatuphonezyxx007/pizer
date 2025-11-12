@@ -14,7 +14,7 @@ app.use(router); // <-- 6. บอกให้ Vue ใช้ Router
 
 // 2. ⭐️ ติดตั้ง reCAPTCHA v3
 app.use(VueReCaptcha, {
-  siteKey: "6LdcfgosAAAAAFdX0oEitdbBPN6_EhiaosSlc-yu", // <-- ‼️ ใส่ Site Key v3 ของคุณที่นี่
+  siteKey: "6LdcfgosAAAAAHbnpT5LGQjAbLbX-pm50z-gCuQS", // <-- ‼️ ใส่ Site Key v3 ของคุณที่นี่
   loaderOptions: {
     autoHideBadge: true, // ซ่อน Badge (ถ้าคุณต้องการ)
   },

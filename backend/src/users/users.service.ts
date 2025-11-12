@@ -24,7 +24,8 @@ export class UsersService {
    * สร้าง User และ InfoPersonal พร้อมกันใน Transaction (ปลอดภัย)
    */
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const { firstName, lastName, phone, ...userDto } = createUserDto;
+    const { firstName, lastName, phone, recaptchaToken, ...userDto } =
+      createUserDto;
 
     // สร้าง Transaction
     const queryRunner = this.dataSource.createQueryRunner();
@@ -74,6 +75,33 @@ export class UsersService {
    */
   async findOneByPhone(phone: string): Promise<InfoPersonal | null> {
     return this.infoPersonalRepository.findOne({ where: { phone } });
+  }
+
+  /**
+   * ⭐️ เพิ่ม: ค้นหาด้วย Identifier (Email, Username, หรือ Phone)
+   */
+  async findOneByIdentifier(identifier: string): Promise<User | null> {
+    // 1. ลองค้นหาด้วย Email
+    let user = await this.usersRepository.findOne({
+      where: { email: identifier },
+      relations: ['roles'],
+    });
+    if (user) return user;
+
+    // 2. ลองค้นหาด้วย Username
+    user = await this.usersRepository.findOne({
+      where: { username: identifier },
+      relations: ['roles'],
+    });
+    if (user) return user;
+
+    // 3. ลองค้นหาด้วย Phone (ต้อง Join ตาราง InfoPersonal)
+    const info = await this.infoPersonalRepository.findOne({
+      where: { phone: identifier },
+      relations: ['user', 'user.roles'], // ‼️ ต้องดึง user และ roles ของ user มาด้วย
+    });
+
+    return info ? info.user : null;
   }
 
   // --- (Method ที่เหลือ findOne, findAll, update, remove เหมือนเดิม) ---

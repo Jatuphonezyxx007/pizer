@@ -34,4 +34,8 @@ export class CreateUserDto {
   @IsString()
   @IsOptional() // อนุญาตให้เป็นค่าว่างได้ (ถ้าคุณไม่บังคับกรอก)
   phone?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  recaptchaToken: string;
 }
