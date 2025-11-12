@@ -3,9 +3,9 @@ import {
   IsString,
   MinLength,
   IsNotEmpty,
-  IsEnum,
+  IsOptional, // <-- Import เพิ่ม
 } from 'class-validator';
-import { UserStatus } from '../entities/user.entity';
+// (UserStatus ไม่จำเป็นต้องใช้ที่นี่แล้ว)
 
 export class CreateUserDto {
   @IsString()
@@ -22,9 +22,16 @@ export class CreateUserDto {
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
   password: string;
 
-  // เราไม่ควรให้ผู้ใช้กำหนด status เองตอนสมัคร
-  // แต่ถ้าจำเป็นต้องมี ก็ใส่ IsOptional()
-  // @IsEnum(UserStatus)
-  // @IsOptional()
-  // status: UserStatus;
+  // --- ⭐️ Field ที่เพิ่มเข้ามา ---
+  @IsString()
+  @IsNotEmpty()
+  firstName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  lastName: string;
+
+  @IsString()
+  @IsOptional() // อนุญาตให้เป็นค่าว่างได้ (ถ้าคุณไม่บังคับกรอก)
+  phone?: string;
 }

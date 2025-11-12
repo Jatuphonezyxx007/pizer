@@ -1,11 +1,20 @@
 <script setup>
-// เราจะลบ HelloWorld ออก เพราะ App.vue ควบคุมโครงสร้างหลัก
+import NavBar from "./components/Navbar/Navbar.vue";
+import Footer from "./components/Footer/Footer.vue";
 </script>
 
 <template>
-  <RouterView />
+  <div class="flex flex-col min-h-screen bg-gray-50">
+    <NavBar />
+
+    <main class="flex-grow">
+      <RouterView />
+    </main>
+
+    <Footer />
+  </div>
 </template>
 
 <style scoped>
-/* สไตล์จาก HelloWorld ไม่จำเป็นแล้ว ลบออกได้ */
+/* ไฟล์นี้ไม่จำเป็นต้องมี style scoped แล้ว เพราะเราใช้ Tailwind */
 </style>

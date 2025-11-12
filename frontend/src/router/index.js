@@ -1,15 +1,30 @@
 import { createRouter, createWebHistory } from "vue-router";
+import Register from "../views/Register.vue";
 
-// เราจะสร้างหน้าเหล่านี้ในขั้นตอนต่อไป
-// import Home from '../views/Home.vue'
-// import Login from '../views/Login.vue'
-// import Register from '../views/Register.vue'
+// 1. Import หน้า Home
+import Home from "../views/Home.vue";
 
 const routes = [
-  // { path: '/', name: 'Home', component: Home },
-  // { path: '/login', name: 'Login', component: Login },
-  // { path: '/register', name: 'Register', component: Register },
-  // (เราจะมาเพิ่มหน้าอื่นๆ ทีหลัง)
+  { path: "/", name: "Home", component: Home },
+
+  {
+    path: "/register",
+    name: "Register",
+    component: Register,
+  },
+
+  // 2. เพิ่มหน้าอื่นๆ (แบบ Placeholder ก่อน)
+  {
+    path: "/products",
+    name: "Products",
+    // ใช้การ lazy-load เพื่อประสิทธิภาพ
+    component: () => import("../views/Products.vue"),
+  },
+  {
+    path: "/cart",
+    name: "Cart",
+    component: () => import("../views/Cart.vue"),
+  },
 ];
 
 const router = createRouter({
