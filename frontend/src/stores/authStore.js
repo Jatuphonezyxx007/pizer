@@ -88,5 +88,13 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   // ⭐️ ส่ง user ออกไปด้วย
-  return { token, user, isAuthenticated, login, logout };
+  return {
+    token,
+    user,
+    isAuthenticated,
+    login,
+    logout,
+    fetchProfile,
+    updateProfile,
+  };
 });
