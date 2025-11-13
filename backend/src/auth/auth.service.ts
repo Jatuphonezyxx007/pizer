@@ -73,16 +73,16 @@ export class AuthService {
       loginUserDto.identifier,
       loginUserDto.password,
     );
-
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials'); // 401
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    // ⭐️ 7. (ย้าย) สร้าง Token
+    // ⭐️ 7. สร้าง Token (อัปเกรด)
     const payload = {
       username: user.username,
       sub: user.id,
-      roles: user.roles,
+      // ⭐️ แก้ไข: แปลง Array of Objects เป็น Array of Strings
+      roles: user.roles.map((role) => role.name),
     };
 
     return {

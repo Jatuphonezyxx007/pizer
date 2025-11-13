@@ -11,49 +11,25 @@ import { CreateUserDto } from 'src/users/dto/create-user.dto';
 // import { LocalAuthGuard } from './guards/local-auth.guard'; // <-- Import (1)
 import { JwtAuthGuard } from './guards/jwt-auth.guard'; // <-- Import (2)
 import { LoginUserDto } from './dto/login-user.dto';
+import { RolesGuard } from './guards/roles.guard'; // ⭐️ 1. Import
+import { Roles } from './decorators/roles.decorator'; // ⭐️ 2. Import
 
-@Controller('auth') // API ทั้งหมดจะขึ้นต้นด้วย /api/v1/auth
+@Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
-
-  /**
-   * 1. API สมัครสมาชิก (Register)
-   * (POST /api/v1/auth/register)
-   * ไม่ต้องมี Guard (เพราะเป็นสาธารณะ)
-   */
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
-    // ValidationPipe (ที่เราตั้งใน main.ts) จะตรวจสอบ createUserDto ก่อน
-    // จากนั้นจึงส่งไปให้ AuthService.register (ที่ทำการ Hash รหัสผ่าน)
     return this.authService.register(createUserDto);
   }
-
-  /**
-   * 2. API เข้าสู่ระบบ (Login)
-   * (POST /api/v1/auth/login)
-   */
-  // @UseGuards(LocalAuthGuard) // <-- แปะป้าย! (1)
   @Post('login')
   async login(@Body() loginUserDto: LoginUserDto) {
-    // ⭐️ 4. รับ Body พร้อม DTO
-    // ValidationPipe จะตรวจสอบ DTO (รวม reCAPTCHA) ก่อน
-    // 5. ส่ง DTO ทั้งก้อนไปให้ AuthService
     return this.authService.login(loginUserDto);
   }
 
-  /**
-   * 3. API ทดสอบการป้องกัน (Profile)
-   * (GET /api/v1/auth/profile)
-   */
-  @UseGuards(JwtAuthGuard) // <-- แปะป้าย! (2)
   @Get('profile')
+  @UseGuards(JwtAuthGuard, RolesGuard) // ⭐️ 3. เรียกยาม 2 คน
+  @Roles('admin', 'user') // ⭐️ 4. แปะป้าย: Admin หรือ User ก็ได้
   getProfile(@Request() req: any) {
-    // 1. @UseGuards(JwtAuthGuard) จะทำงานก่อน
-    // 2. มันจะเรียก JwtStrategy (ยาม)
-    // 3. ยามจะตรวจสอบ Token จาก Header
-    // 4. ถ้า Token ถูกต้อง ยามจะเอา payload (ที่ validate แล้ว) มาแปะที่ req.user
-    // 5. เราสามารถดึงข้อมูลผู้ใช้จาก req.user ได้เลย
     return req.user;
-    // req.user จะมีหน้าตาแบบนี้: { userId: 1, username: 'test', roles: [...] }
   }
 }

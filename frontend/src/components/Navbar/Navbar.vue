@@ -1,9 +1,21 @@
 <script setup>
+import { ref, computed } from "vue"; // ⭐️ 1. Import ref และ computed
 import { RouterLink, useRouter } from "vue-router";
 import { useAuthStore } from "../../stores/authStore"; // ⭐️ 1. Import Store
 
 const authStore = useAuthStore(); // ⭐️ 2. เรียกใช้ Store
 const router = useRouter(); // ⭐️ 3. เรียกใช้ Router (สำหรับ Logout)
+
+// ⭐️ 2. สร้าง state สำหรับเปิด/ปิด Dropdown
+const isDropdownOpen = ref(false);
+
+// ⭐️ 3. สร้าง computed property สำหรับเช็ค 'admin'
+const isAdmin = computed(() => {
+  return (
+    authStore.isAuthenticated &&
+    authStore.user?.roles?.some((role) => role.name === "admin")
+  );
+});
 
 // ⭐️ 4. สร้างฟังก์ชัน Logout
 const handleLogout = () => {
@@ -27,13 +39,61 @@ const handleLogout = () => {
         </template>
 
         <template v-else>
-          <span class="font-semibold">
-            สวัสดี, {{ authStore.user.username }}
-          </span>
-          <div class="h-3 w-px bg-white/40"></div>
-          <button @click="handleLogout" class="font-semibold hover:opacity-80">
-            ออกจากระบบ
-          </button>
+          <div class="relative">
+            <button
+              @click="isDropdownOpen = !isDropdownOpen"
+              class="flex items-center space-x-1 font-semibold hover:opacity-80"
+            >
+              <span>สวัสดี, {{ authStore.user.username }}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                class="w-4 h-4"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
+
+            <div
+              v-if="isDropdownOpen"
+              @click="isDropdownOpen = false"
+              class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 text-black"
+            >
+              <RouterLink
+                to="/account/profile"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                บัญชีของฉัน
+              </RouterLink>
+
+              <RouterLink
+                v-if="isAdmin"
+                to="/admin"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                ภาพรวม (Dashboard)
+              </RouterLink>
+              <RouterLink
+                v-else
+                to="/my-orders"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                การซื้อของฉัน
+              </RouterLink>
+
+              <button
+                @click="handleLogout"
+                class="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+              >
+                ออกจากระบบ
+              </button>
+            </div>
+          </div>
         </template>
       </div>
     </div>

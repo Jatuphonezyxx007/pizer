@@ -211,7 +211,6 @@ const toggleConfirmPasswordVisibility = () => {
               :disabled="isLoading"
               class="w-full bg-[#f94d2f] text-white py-2.5 rounded-sm hover:bg-opacity-90 transition-colors font-semibold mt-6"
             >
-              สมัครสมาชิก
               {{ isLoading ? "กำลังดำเนินการ..." : "สมัครสมาชิก" }}
             </button>
           </form>
