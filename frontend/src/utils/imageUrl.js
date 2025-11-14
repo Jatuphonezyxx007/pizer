@@ -1,16 +1,19 @@
-// ตั้งค่า API URL หลัก
+// (Base URL ของ Backend)
 const API_BASE_URL = "http://localhost:3000";
 
-/**
- * สร้าง URL ที่ถูกต้องสำหรับรูปโปรไฟล์
- * @param {string} filename - ชื่อไฟล์จาก DB (เช่น 'somyimg.png')
- * @returns {string} - URL เต็ม
- */
-export const getProfileImageUrl = (filename) => {
-  if (!filename) {
-    // ⭐️ รูป Default ถ้า user ไม่มีรูป
-    return "https://placehold.co/100x100";
+// (Path ที่เรา Serve Static)
+const AVATAR_PATH = "/assets/uploads/users/profiles/";
+
+// (รูป Default)
+const DEFAULT_AVATAR = "https://placehold.co/200x200/EFEFEF/AAAAAA&text=P";
+
+export function getProfileImageUrl(filename) {
+  if (filename) {
+    // (ป้องกันกรณี filename เป็น URL เต็มอยู่แล้ว)
+    if (filename.startsWith("http")) {
+      return filename;
+    }
+    return `${API_BASE_URL}${AVATAR_PATH}${filename}`;
   }
-  // ⭐️ URL จะเป็น: http://localhost:3000/assets/uploads/users/profiles/somyimg.png
-  return `${API_BASE_URL}/assets/uploads/users/profiles/${filename}`;
-};
+  return DEFAULT_AVATAR;
+}

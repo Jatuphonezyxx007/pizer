@@ -6,27 +6,19 @@ import {
   UpdateDateColumn,
   OneToOne,
   JoinColumn,
-  ManyToOne,
 } from 'typeorm';
 import { User } from './user.entity';
 
-export enum Gender {
-  MALE = 'male',
-  FEMALE = 'female',
-  OTHER = 'other',
-}
-
 @Entity('info_personal')
 export class InfoPersonal {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn()
   id: number;
 
-  // นี่คือ Foreign Key (FK)
-  @Column({ type: 'bigint' })
+  @Column({ type: 'int' })
   user_id: number;
 
   @OneToOne(() => User, (user) => user.info_personal, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' }) // บอกว่า user_id คือ FK
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @Column({ type: 'varchar', length: 100 })
@@ -38,14 +30,21 @@ export class InfoPersonal {
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone: string;
 
-  @Column({ type: 'enum', enum: Gender, nullable: true })
-  gender: Gender;
-
   @Column({ type: 'date', nullable: true })
   birth_date: Date;
 
+  @Column({
+    type: 'enum',
+    enum: ['male', 'female', 'other', 'not_specified'],
+    default: 'not_specified',
+  })
+  gender: string;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
-  profile_image: string;
+  profile_image: string; // เช่น jatuphon.png
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  profile_image_mimetype: string; // เช่น image/png
 
   @CreateDateColumn({ type: 'datetime' })
   created_at: Date;

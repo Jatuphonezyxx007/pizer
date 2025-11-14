@@ -8,46 +8,119 @@ import {
   Delete,
   UseGuards,
   Request,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'; //
-import { RolesGuard } from 'src/auth/guards/roles.guard'; //
-import { Roles } from 'src/auth/decorators/roles.decorator'; //
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // (POST /users ถูกจัดการโดย AuthController.register แล้ว)
+  // --- Endpoint สำหรับ User ทั่วไป (จัดการโปรไฟล์ตัวเอง) ---
 
-  // (เพิ่ม) Endpoint สำหรับ "ดึง" ข้อมูลโปรไฟล์ของตัวเอง
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   getProfile(@Request() req: any) {
-    // return this.usersService.getProfile(req.user.userId);
+    // req.user มาจาก JwtAuthGuard (ดูใน jwt.strategy.ts)
+    // มันมี { userId: number, username: string, roles: string[] }
     return this.usersService.getProfile(req.user.userId);
   }
 
-  // (เพิ่ม) Endpoint สำหรับ "อัปเดต" ข้อมูลโปรไฟล์ของตัวเอง
   @Patch('profile')
   @UseGuards(JwtAuthGuard)
   updateProfile(
     @Request() req: any,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    // return this.usersService.updateProfile(req.user.sub, updateProfileDto);
     return this.usersService.updateProfile(req.user.userId, updateProfileDto);
   }
 
-  // --- (Endpoints เดิมสำหรับ Admin) ---
+  @Post('profile/avatar')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      // 'avatar' คือ key ใน FormData ที่ส่งมาจาก frontend
+      storage: diskStorage({
+        destination: './assets/uploads/users/profiles',
+        filename: (req, file, cb) => {
+          const user = (req as any).user;
+          if (!user || !user.username) {
+            return cb(new BadRequestException('User not found in token'), null);
+          }
+          // 1. Sanitize username (ป้องกัน path traversal)
+          const safeUsername = user.username
+            .replace(/[^a-z0-9_.-]/gi, '_')
+            .toLowerCase();
+          // 2. ดึงนามสกุลไฟล์เดิม
+          const extension = path.extname(file.originalname);
+          // 3. ตั้งชื่อไฟล์ใหม่: username.extension
+          cb(null, `${safeUsername}${extension}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowedMimes = [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/webp',
+        ];
+        if (allowedMimes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(
+            new BadRequestException(
+              'Invalid file type. Only JPEG, PNG, WEBP are allowed.',
+            ),
+            false,
+          );
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
+  async uploadAvatar(
+    @Request() req: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required.');
+    }
+
+    // file.filename คือชื่อใหม่ที่เราตั้ง (เช่น 'jatuphon.png')
+    // file.mimetype คือชนิดไฟล์ (เช่น 'image/png')
+    return this.usersService.updateAvatar(
+      req.user.userId,
+      file.filename,
+      file.mimetype,
+    );
+  }
+
+  // --- Endpoints สำหรับ Admin (จัดการ User ทั้งหมด) ---
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   findAll() {
     return this.usersService.findAll();
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  create(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.create(createUserDto);
   }
 
   @Get(':id')

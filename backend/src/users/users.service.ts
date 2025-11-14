@@ -3,14 +3,16 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
-import { Repository, DataSource, Not } from 'typeorm';
 import { InfoPersonal } from './entities/info-personal.entity';
-import { RolesService } from 'src/roles/roles.service'; //
-import { UpdateProfileDto } from './dto/update-profile.dto'; // (ไฟล์ที่เราเพิ่งสร้าง)
+import { RolesService } from 'src/roles/roles.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 @Injectable()
 export class UsersService {
@@ -19,165 +21,208 @@ export class UsersService {
     private usersRepository: Repository<User>,
     @InjectRepository(InfoPersonal)
     private infoPersonalRepository: Repository<InfoPersonal>,
-    private dataSource: DataSource,
     private rolesService: RolesService,
   ) {}
 
-  /**
-   * สร้าง User และ InfoPersonal (จาก Auth)
-   */
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    const { firstName, lastName, phone, recaptchaToken, ...userDto } =
-      createUserDto;
-
-    const defaultRole = await this.rolesService.findByName('user');
-    if (!defaultRole) {
-      throw new NotFoundException(
-        '"user" role not found. Please seed database.',
-      );
-    }
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const user = this.usersRepository.create({
-        ...userDto,
-        roles: [defaultRole],
-      });
-      const savedUser = await queryRunner.manager.save(user);
-
-      const info = this.infoPersonalRepository.create({
-        first_name: firstName,
-        last_name: lastName,
-        phone: phone,
-        user: savedUser,
-        user_id: savedUser.id,
-      });
-      await queryRunner.manager.save(info);
-
-      await queryRunner.commitTransaction();
-      return savedUser;
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  // --- (ฟังก์ชันสำหรับ Auth) ---
-
-  async findOneByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({
-      where: { email },
-      relations: ['roles'],
-    });
-  }
-
-  async findOneByPhone(phone: string): Promise<InfoPersonal | null> {
-    return this.infoPersonalRepository.findOne({ where: { phone } });
-  }
-
-  async findOneByIdentifier(identifier: string): Promise<User | null> {
-    let user = await this.usersRepository.findOne({
-      where: { email: identifier },
-      relations: ['roles', 'info_personal'],
-    });
-    if (user) return user;
-
-    user = await this.usersRepository.findOne({
-      where: { username: identifier },
-      relations: ['roles', 'info_personal'],
-    });
-    if (user) return user;
-
-    const info = await this.infoPersonalRepository.findOne({
-      where: { phone: identifier },
-      relations: ['user', 'user.roles', 'user.info_personal'],
-    });
-
-    return info ? info.user : null;
-  }
-
-  // --- (ฟังก์ชันสำหรับ Profile) ---
+  // --- Service สำหรับ User ทั่วไป (จัดการโปรไฟล์ตัวเอง) ---
 
   async getProfile(userId: number): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
-      relations: ['info_personal', 'roles'],
+      relations: [
+        'info_personal',
+        'addresses',
+        'roles', // ส่ง roles ไปด้วย
+      ],
+      select: {
+        // เลือกเฉพาะ field ที่จำเป็น
+        id: true,
+        username: true,
+        email: true,
+        is_active: true,
+        roles: {
+          id: true,
+          name: true,
+        },
+        info_personal: {
+          // เลือก field ทั้งหมดจาก info_personal
+          id: true,
+          first_name: true,
+          last_name: true,
+          phone: true,
+          birth_date: true,
+          gender: true,
+          profile_image: true,
+          profile_image_mimetype: true, // ส่ง mimetype ไปด้วย
+        },
+        addresses: true, // ส่ง addresses ไปด้วย (ถ้ามี)
+      },
     });
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
     return user;
   }
 
-  async updateProfile(userId: number, dto: UpdateProfileDto): Promise<User> {
-    if (dto.email) {
-      const existing = await this.usersRepository.findOne({
-        where: { email: dto.email, id: Not(userId) },
-      });
-      if (existing) {
-        throw new ConflictException('Email already exists');
-      }
-    }
-
-    if (dto.phone) {
-      const existing = await this.infoPersonalRepository.findOne({
-        where: { phone: dto.phone, user_id: Not(userId) },
-      });
-      if (existing) {
-        throw new ConflictException('Phone number already exists');
-      }
-    }
-
-    return this.dataSource.transaction(async (manager) => {
-      const user = await manager.findOneBy(User, { id: userId });
-      const info = await manager.findOneBy(InfoPersonal, { user_id: userId });
-
-      if (!user || !info) {
-        throw new NotFoundException('User or Profile not found');
-      }
-
-      manager.merge(User, user, {
-        username: dto.username,
-        email: dto.email,
-      });
-      await manager.save(user);
-
-      manager.merge(InfoPersonal, info, {
-        first_name: dto.firstName,
-        last_name: dto.lastName,
-        phone: dto.phone,
-        gender: dto.gender,
-        birth_date: dto.birthdate ? new Date(dto.birthdate) : undefined,
-      });
-      await manager.save(info);
-
-      return this.getProfile(userId);
+  async updateProfile(
+    userId: number,
+    updateProfileDto: UpdateProfileDto,
+  ): Promise<InfoPersonal> {
+    const info = await this.infoPersonalRepository.findOne({
+      where: { user_id: userId },
     });
+
+    if (!info) {
+      throw new NotFoundException('User profile not found');
+    }
+
+    // อัปเดตเฉพาะ field ที่ส่งมา
+    Object.assign(info, updateProfileDto);
+
+    return this.infoPersonalRepository.save(info);
   }
 
-  // --- (ฟังก์ชัน CRUD สำหรับ Admin) ---
+  async updateAvatar(
+    userId: number,
+    newFilename: string,
+    newMimeType: string,
+  ): Promise<InfoPersonal> {
+    const info = await this.infoPersonalRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!info) {
+      throw new NotFoundException('User profile not found');
+    }
+
+    const oldFilename = info.profile_image;
+    const uploadPath = path.join(
+      process.cwd(),
+      'assets',
+      'uploads',
+      'users',
+      'profiles',
+    );
+
+    // 1. อัปเดตฐานข้อมูล
+    info.profile_image = newFilename;
+    info.profile_image_mimetype = newMimeType;
+
+    try {
+      const updatedInfo = await this.infoPersonalRepository.save(info);
+
+      // 2. ลบไฟล์เก่า (ถ้ามี และไม่ซ้ำกับไฟล์ใหม่)
+      if (oldFilename && oldFilename !== newFilename) {
+        const oldFilePath = path.join(uploadPath, oldFilename);
+        try {
+          await fs.unlink(oldFilePath);
+        } catch (err) {
+          // ไม่ต้อง throw error, แค่ log ไว้
+          // อาจเกิดกรณีไฟล์เก่าไม่มีอยู่แล้ว
+          console.warn(
+            `Failed to delete old avatar: ${oldFilePath}`,
+            err.message,
+          );
+        }
+      }
+
+      return updatedInfo;
+    } catch (dbError) {
+      // 3. ถ้า DB พัง, ลบไฟล์ใหม่ที่เพิ่งอัปโหลด (Rollback)
+      const newFilePath = path.join(uploadPath, newFilename);
+      try {
+        await fs.unlink(newFilePath);
+      } catch (unlinkErr) {
+        console.error(`Failed to rollback new avatar: ${newFilePath}`);
+      }
+      throw new ConflictException(
+        'Failed to update database.',
+        dbError.message,
+      );
+    }
+  }
+
+  // --- Service สำหรับ Admin (จัดการ User ทั้งหมด) ---
 
   findAll() {
     return this.usersRepository.find({ relations: ['info_personal', 'roles'] });
   }
 
-  findOne(id: number) {
-    return this.usersRepository.findOne({
+  async findOne(id: number) {
+    const user = await this.usersRepository.findOne({
       where: { id },
-      relations: ['info_personal', 'addresses', 'roles'],
+      relations: ['info_personal', 'roles'],
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    return user;
+  }
+
+  async findByUsername(username: string): Promise<User | undefined> {
+    return this.usersRepository.findOne({
+      where: { username },
+      relations: ['roles'],
     });
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return this.usersRepository.update(id, updateUserDto);
+  async findByEmail(email: string): Promise<User | undefined> {
+    return this.usersRepository.findOne({
+      where: { email },
+      relations: ['roles'],
+    });
   }
 
-  remove(id: number) {
-    return this.usersRepository.delete(id);
+  async create(createUserDto: CreateUserDto): Promise<User> {
+    // 1. ตรวจสอบ Role
+    const defaultRole = await this.rolesService.findByName('user');
+    if (!defaultRole) {
+      throw new NotFoundException('Default role "user" not found');
+    }
+
+    // 2. สร้าง User
+    const user = this.usersRepository.create({
+      username: createUserDto.username,
+      email: createUserDto.email,
+      password: createUserDto.password, // (password จะถูก hash ใน pre-save hook ของ User entity)
+      roles: [defaultRole],
+    });
+    const savedUser = await this.usersRepository.save(user);
+
+    // 3. สร้าง InfoPersonal
+    const info = this.infoPersonalRepository.create({
+      user_id: savedUser.id,
+      first_name: createUserDto.first_name,
+      last_name: createUserDto.last_name,
+      phone: createUserDto.phone || null,
+    });
+    await this.infoPersonalRepository.save(info);
+
+    // ลบ password ก่อนส่งกลับ
+    delete savedUser.password;
+    return savedUser;
+  }
+
+  async update(id: number, updateUserDto: UpdateUserDto) {
+    const user = await this.findOne(id); // (findOne มี check NotFound)
+
+    // (ยังไม่รองรับการอัปเดต password หรือ roles ผ่านทางนี้)
+    // (ควรรองรับการอัปเดต InfoPersonal และ Address แยก)
+
+    this.usersRepository.merge(user, {
+      username: updateUserDto.username,
+      email: updateUserDto.email,
+      is_active: updateUserDto.is_active,
+    });
+
+    return this.usersRepository.save(user);
+  }
+
+  async remove(id: number) {
+    const user = await this.findOne(id);
+    // (เนื่องจากตั้งค่า 'onDelete: CASCADE' ใน Entity,
+    // เมื่อลบ User, info_personal และ address จะถูกลบไปด้วย)
+    await this.usersRepository.remove(user);
+    return { message: `User ${user.username} (ID: ${id}) deleted.` };
   }
 }

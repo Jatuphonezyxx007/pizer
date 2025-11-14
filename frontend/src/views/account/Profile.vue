@@ -1,255 +1,346 @@
 <script setup>
-import { ref, onMounted } from "vue"; // ⭐️ 1. Import onMounted
-import { useAuthStore } from "../../stores/authStore"; // ⭐️ 2. Import Store
+import { ref, onMounted, computed } from "vue";
+import { useAuthStore } from "../../stores/authStore";
+import { getProfileImageUrl } from "../../utils/imageUrl"; // ⭐️ (เพิ่ม)
 
 const authStore = useAuthStore();
 
-// ⭐️ 3. ตั้งค่า state เริ่มต้นเป็นค่าว่าง (รอรับข้อมูลจริง)
+// (State สำหรับ Form)
 const profile = ref({
-  username: "",
-  firstName: "", // (ไฟล์เดิมคุณคือ 'name')
-  lastName: "",
-  email: "",
+  first_name: "",
+  last_name: "",
+  email: "", // (Email จะแสดงเฉยๆ, แก้ไขไม่ได้)
   phone: "",
   gender: "",
-  birthdate: "",
-  avatarUrl: "https://placehold.co/200x200", // (Avatar ยังใช้ mock data)
+  birth_date: "",
+  // ⭐️ (ลบ) avatarUrl ออกจากที่นี่ เพราะเราจะใช้ computed
 });
 
-// State สำหรับจัดการการโหลดและ Error
-const isLoading = ref(false);
-const isDataLoading = ref(true); // ⭐️ (เพิ่ม) state สำหรับตอนโหลดข้อมูล (ตั้งเป็น true)
+// (State สำหรับการโหลด/Error ของ Form)
+const isLoading = ref(false); // (สำหรับปุ่ม Save)
+const isDataLoading = ref(true); // (สำหรับตอนโหลดข้อมูล)
 const errorMessage = ref(null);
 const successMessage = ref(null);
 
-// ⭐️ 4. (สำคัญ) ฟังก์ชันดึงข้อมูลเมื่อเปิดหน้า
+// ⭐️ (เพิ่ม) State สำหรับการอัปโหลด
+const fileInput = ref(null); // (สำหรับ <input type="file">)
+const isUploading = ref(false);
+const uploadError = ref(null);
+const uploadSuccess = ref(null);
+
+// ⭐️ (เพิ่ม) Computed property สำหรับ Avatar URL (เพื่อให้ reactive)
+const avatarUrl = computed(() => {
+  // (ใช้ authStore.user โดยตรง)
+  const filename = authStore.user?.info_personal?.profile_image;
+  return getProfileImageUrl(filename);
+});
+
+// (ฟังก์ชันดึงข้อมูลเมื่อเปิดหน้า)
 onMounted(async () => {
   isDataLoading.value = true;
   errorMessage.value = null;
   try {
-    // ⭐️ 5. สั่งให้ Store ไปดึงข้อมูลโปรไฟล์ (ยิง API GET /api/v1/users/profile)
-    // (เราจะเรียก fetchProfile เสมอ เพื่อให้ได้ข้อมูลล่าสุด)
-    await authStore.fetchProfile();
+    // (ถ้า user ใน store ยังไม่มีข้อมูล ให้ fetch)
+    if (!authStore.user?.info_personal) {
+      await authStore.fetchProfile();
+    }
 
-    // ⭐️ 6. แยกข้อมูลจาก Store (ที่เพิ่งอัปเดต) มาใส่ใน form
+    // (Map ข้อมูลจาก store มาใส่ form)
     const userData = authStore.user;
-    const infoData = userData.info_personal; //
-
-    if (userData && infoData) {
-      profile.value = {
-        username: userData.username,
-        email: userData.email,
-        firstName: infoData.first_name, // ⭐️ แมปชื่อ field (first_name -> firstName)
-        lastName: infoData.last_name,
-        phone: infoData.phone || "", // ใช้ || '' เพื่อป้องกันค่า null
-        gender: infoData.gender || "",
-        // ⭐️ แปลง Date ให้เป็น format YYYY-MM-DD
-        birthdate: infoData.birth_date ? infoData.birth_date.split("T")[0] : "",
-        avatarUrl: infoData.profile_image || "https://placehold.co/200x200",
-      };
+    if (userData) {
+      profile.value.email = userData.email || "";
+      const infoData = userData.info_personal;
+      if (infoData) {
+        profile.value.first_name = infoData.first_name || "";
+        profile.value.last_name = infoData.last_name || "";
+        profile.value.phone = infoData.phone || "";
+        profile.value.gender = infoData.gender || "not_specified";
+        // (แปลง Date format 2024-01-01T00:00:00.000Z -> 2024-01-01)
+        profile.value.birth_date = infoData.birth_date
+          ? infoData.birth_date.split("T")[0]
+          : "";
+      }
     } else {
       throw new Error("ไม่พบข้อมูลผู้ใช้");
     }
   } catch (error) {
-    errorMessage.value = "ไม่สามารถโหลดข้อมูลโปรไฟล์ได้";
     console.error(error);
+    if (error.response && error.response.status === 401) {
+      // (ถ้า Guard ทำงานไม่ทัน, store จะ logout ให้อยู่ดี)
+      errorMessage.value = "เซสชั่นหมดอายุ, กรุณาเข้าสู่ระบบใหม่";
+    } else {
+      errorMessage.value = "ไม่สามารถโหลดข้อมูลโปรไฟล์ได้";
+    }
   } finally {
     isDataLoading.value = false;
   }
 });
 
-// ⭐️ 7. ฟังก์ชัน "บันทึก" (อัปเดตแล้ว)
-const handleSubmit = async () => {
+// (ฟังก์ชันบันทึกการแก้ไขโปรไฟล์)
+const handleUpdateProfile = async () => {
   isLoading.value = true;
   errorMessage.value = null;
   successMessage.value = null;
+  uploadError.value = null; // (เคลียร์ error ของ upload)
+  uploadSuccess.value = null;
 
   try {
-    // ⭐️ 8. ส่งข้อมูล (เฉพาะที่ฟอร์มมี) ไปให้ Store (ยิง API PATCH /api/v1/users/profile)
-    await authStore.updateProfile({
-      username: profile.value.username,
-      email: profile.value.email,
-      firstName: profile.value.firstName, // ⭐️ ส่งเป็น firstName
-      lastName: profile.value.lastName,
+    // (คัดลอกเฉพาะ field ที่ต้องการส่ง)
+    const dataToUpdate = {
+      first_name: profile.value.first_name,
+      last_name: profile.value.last_name,
       phone: profile.value.phone,
       gender: profile.value.gender,
-      birthdate: profile.value.birthdate,
-    });
-    successMessage.value = "บันทึกข้อมูลเรียบร้อย!";
+      // (ส่ง null ถ้าวันเกิดเป็น "" เพื่อล้างค่าใน DB)
+      birth_date: profile.value.birth_date || null,
+    };
+
+    await authStore.updateProfile(dataToUpdate);
+    successMessage.value = "บันทึกข้อมูลเรียบร้อยแล้ว";
   } catch (error) {
-    // ⭐️ 9. แสดง Error ที่ Backend ส่งกลับมา (เช่น "Email already exists")
-    if (error.response && error.response.data) {
-      errorMessage.value = error.response.data.message;
-    } else {
-      errorMessage.value = "เกิดข้อผิดพลาด ไม่สามารถเชื่อมต่อได้";
-    }
+    console.error(error);
+    errorMessage.value =
+      error.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึก";
   } finally {
     isLoading.value = false;
+  }
+};
+
+// ⭐️ (เพิ่ม) ฟังก์ชันเมื่อคลิกปุ่ม "เลือกรูป"
+const triggerFileInput = () => {
+  fileInput.value.click();
+};
+
+// ⭐️ (เพิ่ม) ฟังก์ชันเมื่อเลือกไฟล์
+const onFileSelected = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  isUploading.value = true;
+  uploadError.value = null;
+  uploadSuccess.value = null;
+  errorMessage.value = null; // (เคลียร์ error เก่าของ Form)
+  successMessage.value = null;
+
+  try {
+    const formData = new FormData();
+    formData.append("avatar", file); // 'avatar' ต้องตรงกับ FileInterceptor
+
+    // เรียก action ใหม่ใน store
+    await authStore.uploadAvatar(formData);
+
+    uploadSuccess.value = "อัปโหลดรูปสำเร็จ!";
+    // ⭐️ ไม่ต้องเซ็ต profile.avatarUrl เพราะ avatarUrl เป็น computed
+    // ⭐️ ที่ผูกกับ authStore.user อยู่แล้ว มันจะอัปเดตเอง
+  } catch (error) {
+    if (error.response && error.response.data) {
+      uploadError.value =
+        error.response.data.message || "เกิดข้อผิดพลาดในการอัปโหลด";
+    } else {
+      uploadError.value = "เกิดข้อผิดพลาดในการอัปโหลด";
+    }
+  } finally {
+    isUploading.value = false;
+    if (fileInput.value) fileInput.value.value = ""; // (เคลียร์ input)
   }
 };
 </script>
 
 <template>
-  <div class="bg-white rounded-md shadow-sm">
-    <div v-if="isDataLoading" class="p-6 text-center text-gray-500">
-      กำลังโหลดข้อมูล...
-    </div>
+  <div class="p-6">
+    <h1 class="text-2xl font-semibold text-gray-800 mb-6">บัญชีของฉัน</h1>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3">
-      <form @submit.prevent="handleSubmit" class="lg:col-span-2 p-6 space-y-4">
-        <div
-          v-if="successMessage"
-          class="p-3 bg-green-100 text-green-700 rounded-lg"
+    <div
+      class="bg-white rounded-sm border border-gray-200 lg:grid lg:grid-cols-3"
+    >
+      <div
+        v-if="isDataLoading"
+        class="lg:col-span-3 flex justify-center items-center h-64"
+      >
+        <svg
+          class="animate-spin h-8 w-8 text-gray-600"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
         >
-          {{ successMessage }}
-        </div>
-        <div v-if="errorMessage" class="p-3 bg-red-100 text-red-700 rounded-lg">
-          {{ errorMessage }}
-        </div>
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
+        </svg>
+      </div>
 
-        <div class="grid grid-cols-3 items-center gap-4">
-          <label for="username" class="text-gray-500 text-sm text-right">
-            ชื่อผู้ใช้
-          </label>
-          <div class="col-span-2">
+      <div vif="!isDataLoading && errorMessage" class="lg:col-span-3 p-6">
+        <p class="text-red-600 text-center">{{ errorMessage }}</p>
+      </div>
+
+      <form
+        v-if="!isDataLoading && !errorMessage"
+        @submit.prevent="handleUpdateProfile"
+        class="p-6 lg:col-span-2"
+      >
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label
+              for="username"
+              class="block text-sm font-medium text-gray-500"
+              >ชื่อผู้ใช้ (Username)</label
+            >
             <input
               type="text"
               id="username"
-              v-model="profile.username"
+              :value="authStore.user?.username || ''"
               disabled
-              class="w-full px-3 py-2 border rounded-sm text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
+              class="mt-1 block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-sm shadow-sm text-gray-500 cursor-not-allowed"
             />
           </div>
-        </div>
-        <div class="grid grid-cols-3 items-center gap-4">
-          <label class="text-gray-500 text-sm text-right">
-            ชื่อ - นามสกุล
-          </label>
 
-          <div class="col-span-2 grid grid-cols-2 gap-4">
-            <div>
-              <input
-                type="text"
-                id="firstName"
-                v-model="profile.firstName"
-                placeholder="ชื่อ"
-                class="w-full px-3 py-2 border rounded-sm text-sm"
-              />
-            </div>
-
-            <div>
-              <input
-                type="text"
-                id="lastName"
-                v-model="profile.lastName"
-                placeholder="นามสกุล"
-                class="w-full px-3 py-2 border rounded-sm text-sm"
-              />
-            </div>
-          </div>
-        </div>
-        <!-- <div class="grid grid-cols-3 items-center gap-4">
-          <label for="lastName" class="text-gray-500 text-sm text-right">
-            นามสกุล
-          </label>
-          <div class="col-span-2">
-            <input
-              type="text"
-              id="lastName"
-              v-model="profile.lastName"
-              class="w-full px-3 py-2 border rounded-sm text-sm"
-            />
-          </div>
-        </div> -->
-
-        <div class="grid grid-cols-3 items-center gap-4">
-          <label for="email" class="text-gray-500 text-sm text-right">
-            อีเมล
-          </label>
-          <div class="col-span-2">
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-500"
+              >อีเมล</label
+            >
             <input
               type="email"
               id="email"
               v-model="profile.email"
-              class="w-full px-3 py-2 border rounded-sm text-sm"
+              disabled
+              class="mt-1 block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-sm shadow-sm text-gray-500 cursor-not-allowed"
             />
           </div>
-        </div>
 
-        <div class="grid grid-cols-3 items-center gap-4">
-          <label for="phone" class="text-gray-500 text-sm text-right">
-            เบอร์โทรศัพท์
-          </label>
-          <div class="col-span-2">
+          <div>
+            <label
+              for="first_name"
+              class="block text-sm font-medium text-gray-500"
+              >ชื่อจริง</label
+            >
+            <input
+              type="text"
+              id="first_name"
+              v-model="profile.first_name"
+              class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-sm shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500"
+            />
+          </div>
+
+          <div>
+            <label
+              for="last_name"
+              class="block text-sm font-medium text-gray-500"
+              >นามสกุล</label
+            >
+            <input
+              type="text"
+              id="last_name"
+              v-model="profile.last_name"
+              class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-sm shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500"
+            />
+          </div>
+
+          <div>
+            <label for="phone" class="block text-sm font-medium text-gray-500"
+              >เบอร์โทรศัพท์</label
+            >
             <input
               type="text"
               id="phone"
               v-model="profile.phone"
-              class="w-full px-3 py-2 border rounded-sm text-sm"
+              class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-sm shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500"
             />
           </div>
-        </div>
 
-        <div class="grid grid-cols-3 items-center gap-4">
-          <label class="text-gray-500 text-sm text-right">เพศ</label>
-          <div class="col-span-2 flex space-x-4">
-            <label class="flex items-center">
-              <input
-                type="radio"
-                value="male"
-                v-model="profile.gender"
-                class="mr-1"
-              />
-              ชาย
-            </label>
-            <label class="flex items-center">
-              <input
-                type="radio"
-                value="female"
-                v-model="profile.gender"
-                class="mr-1"
-              />
-              หญิง
-            </label>
-            <label class="flex items-center">
-              <input
-                type="radio"
-                value="other"
-                v-model="profile.gender"
-                class="mr-1"
-              />
-              อื่น ๆ
-            </label>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3 items-center gap-4">
-          <label for="birthdate" class="text-gray-500 text-sm text-right"
-            >วันเดือนปีเกิด</label
-          >
-          <div class="col-span-2">
+          <div>
+            <label
+              for="birth_date"
+              class="block text-sm font-medium text-gray-500"
+              >วันเกิด</label
+            >
             <input
               type="date"
-              id="birthdate"
-              v-model="profile.birthdate"
-              class="w-full px-3 py-2 border rounded-sm text-sm"
+              id="birth_date"
+              v-model="profile.birth_date"
+              class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-sm shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500"
             />
+          </div>
+
+          <div class="md:col-span-2">
+            <label for="gender" class="block text-sm font-medium text-gray-500"
+              >เพศ</label
+            >
+            <select
+              id="gender"
+              v-model="profile.gender"
+              class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-sm shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500"
+            >
+              <option value="not_specified">ไม่ระบุ</option>
+              <option value="male">ชาย</option>
+              <option value="female">หญิง</option>
+              <option value="other">อื่น ๆ</option>
+            </select>
           </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-4">
-          <div></div>
-          <div class="col-span-2">
-            <button
-              type="submit"
-              :disabled="isLoading || isDataLoading"
-              class="bg-[#f94d2f] text-white px-6 py-2 rounded-sm hover:bg-opacity-90 disabled:bg-gray-400"
-            >
-              {{ isLoading ? "กำลังบันทึก..." : "บันทึก" }}
-            </button>
-          </div>
+        <div class="mt-8">
+          <p v-if="successMessage" class="text-green-600 text-sm mb-2">
+            {{ successMessage }}
+          </p>
+          <button
+            type="submit"
+            :disabled="isLoading || isUploading"
+            class="w-full md:w-auto bg-gray-800 text-white px-6 py-2 rounded-sm text-sm font-medium hover:bg-gray-700 disabled:bg-gray-400"
+          >
+            {{ isLoading ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง" }}
+          </button>
         </div>
       </form>
+
+      <div
+        v-if="!isDataLoading && !errorMessage"
+        class="lg:col-span-1 p-6 border-t lg:border-t-0 lg:border-l border-gray-200"
+      >
+        <div class="flex flex-col items-center">
+          <label class="text-gray-500 text-sm mb-4">รูปโปรไฟล์</label>
+          <img
+            :src="avatarUrl"
+            alt="Avatar"
+            class="w-40 h-40 rounded-full object-cover border-4 border-gray-200 mb-4 bg-gray-100"
+          />
+          <input
+            type="file"
+            @change="onFileSelected"
+            accept="image/png, image/jpeg, image/webp"
+            class="hidden"
+            ref="fileInput"
+          />
+          <button
+            @click="triggerFileInput"
+            :disabled="isUploading || isLoading"
+            class="w-full bg-gray-700 text-white px-4 py-2 rounded-sm text-sm hover:bg-gray-800 disabled:bg-gray-400"
+          >
+            {{ isUploading ? "กำลังอัปโหลด..." : "เปลี่ยนรูปภาพ" }}
+          </button>
+          <p class="text-xs text-gray-500 mt-2 text-center">
+            อนุญาต: JPG, PNG, WEBP (สูงสุด 5MB)
+          </p>
+          <p v-if="uploadError" class="text-red-600 text-sm mt-3 text-center">
+            {{ uploadError }}
+          </p>
+          <p
+            v-if="uploadSuccess"
+            class="text-green-600 text-sm mt-3 text-center"
+          >
+            {{ uploadSuccess }}
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
