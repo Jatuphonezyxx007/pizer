@@ -2,9 +2,17 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet'; // <-- แก้ไขบรรทัดนี้
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path'; // ⭐️ 2. Import เพิ่ม
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // ⭐️ 4. เพิ่มบรรทัดนี้ (วางไว้ใกล้ๆ app.use(helmet()))
+  // นี่คือการบอกว่า "ถ้ามีการเรียก URL /assets ให้ไปหาไฟล์ในโฟลเดอร์ assets"
+  app.useStaticAssets(join(__dirname, '..', 'assets'), {
+    prefix: '/assets', // URL ที่จะใช้เข้าถึง: http://localhost:3000/assets/...
+  });
 
   // 1. Security Headers
   app.use(helmet()); // <-- ตอนนี้จะทำงานได้แล้ว

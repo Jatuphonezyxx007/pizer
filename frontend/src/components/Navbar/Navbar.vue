@@ -17,6 +17,17 @@ const isAdmin = computed(() => {
   );
 });
 
+// ⭐️ 1. สร้าง Computed Property สำหรับ URL รูปภาพ
+const backendUrl = "http://localhost:3000"; // URL ของ Backend
+const profilePictureUrl = computed(() => {
+  // ⭐️ 2. ตรวจสอบว่ามีข้อมูล user, info_personal และ profile_image หรือไม่
+  if (authStore.user?.info_personal?.profile_image) {
+    // ⭐️ 3. ประกอบร่าง URL ที่ถูกต้อง
+    return `${backendUrl}/assets/uploads/users/profiles/${authStore.user.info_personal.profile_image}`;
+  }
+  return null; // ถ้าไม่มี ให้คืนค่า null
+});
+
 // ⭐️ 4. สร้างฟังก์ชัน Logout
 const handleLogout = () => {
   authStore.logout();
@@ -44,6 +55,18 @@ const handleLogout = () => {
               @click="isDropdownOpen = !isDropdownOpen"
               class="flex items-center space-x-1 font-semibold hover:opacity-80"
             >
+              <template v-if="profilePictureUrl">
+                <img
+                  :src="profilePictureUrl"
+                  :alt="authStore.user.username"
+                  class="w-6 h-6 rounded-full object-cover border border-white/50"
+                />
+              </template>
+              <template v-else>
+                <span class="material-symbols-outlined text-xl">
+                  account_circle
+                </span>
+              </template>
               <span>สวัสดี, {{ authStore.user.username }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
