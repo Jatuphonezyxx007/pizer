@@ -56,7 +56,8 @@ export class UsersController {
         filename: (req, file, cb) => {
           const user = (req as any).user;
           if (!user || !user.username) {
-            return cb(new BadRequestException('User not found in token'), null);
+            // 🛑 FIX: เปลี่ยน null เป็น '' (string ว่าง)
+            return cb(new BadRequestException('User not found in token'), '');
           }
           // 1. Sanitize username (ป้องกัน path traversal)
           const safeUsername = user.username
@@ -120,6 +121,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   create(@Body() createUserDto: CreateUserDto) {
+    // (หมายเหตุ: การสร้าง User ควรทำผ่าน /auth/register
+    // Endpoint นี้สำหรับ Admin สร้าง User โดยตรง)
     return this.usersService.create(createUserDto);
   }
 

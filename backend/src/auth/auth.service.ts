@@ -42,7 +42,7 @@ export class AuthService {
 
   // --- (validateUser และ login method เหมือนเดิม) ---
   async validateUser(identifier: string, pass: string): Promise<any> {
-    // ⭐️ 2. แก้ไข: ใช้ method ใหม่
+    // ⭐️ 2. แก้ไข: ใช้ method ใหม่ (ที่เราจะสร้างใน UsersService)
     const user = await this.usersService.findOneByIdentifier(identifier);
     if (!user) {
       return null; // ไม่พบผู้ใช้
@@ -87,7 +87,7 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(payload),
-      user: user,
+      user: user, // ส่ง user data กลับไปด้วย
     };
   }
 
@@ -104,7 +104,8 @@ export class AuthService {
     }
 
     // 3.1 ตรวจสอบ Email ซ้ำ
-    const existingUser = await this.usersService.findOneByEmail(
+    // 🛑 FIX: แก้ findOneByEmail -> findByEmail
+    const existingUser = await this.usersService.findByEmail(
       createUserDto.email,
     );
     if (existingUser) {
@@ -113,6 +114,7 @@ export class AuthService {
 
     // 3.2 (เพิ่ม) ตรวจสอบเบอร์โทรซ้ำ (ถ้ามีการส่งเบอร์มา)
     if (createUserDto.phone) {
+      // (เราจะสร้าง findOneByPhone ใน UsersService)
       const existingPhone = await this.usersService.findOneByPhone(
         createUserDto.phone,
       );
@@ -122,7 +124,7 @@ export class AuthService {
     }
 
     // 3.3 ลบ recaptchaToken ออกจาก DTO ก่อนส่งไปสร้าง user
-    // const { recaptchaToken, ...userData } = createUserDto;
+    // (เราจะ map field แทนการส่ง DTO ตรงๆ)
 
     // 3.4 Hash รหัสผ่าน
     const saltOrRounds = 10;
@@ -140,10 +142,13 @@ export class AuthService {
     // 3.6 บันทึกลงฐานข้อมูล
     try {
       const createdUser = await this.usersService.create(userToCreate);
+
+      // 3.7 (สำคัญ) การลบ password จะทำที่นี่ (AuthService)
+      // UsersService.create จะ return user object แบบมี password
       const { password, ...result } = createdUser;
       return result;
     } catch (error) {
-      // 3.7 (อัปเกรด) ตรวจจับ Error จาก DB (เช่น Username ซ้ำ)
+      // 3.8 (อัปเกรด) ตรวจจับ Error จาก DB (เช่น Username ซ้ำ)
       if (error.code === 'ER_DUP_ENTRY') {
         if (error.message.includes('username')) {
           throw new ConflictException('Username already exists');

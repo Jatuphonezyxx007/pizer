@@ -9,6 +9,14 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 
+// 🛑 FIX: สร้างและ Export Enum
+export enum Gender {
+  MALE = 'male',
+  FEMALE = 'female',
+  OTHER = 'other',
+  NOT_SPECIFIED = 'not_specified',
+}
+
 @Entity('info_personal')
 export class InfoPersonal {
   @PrimaryGeneratedColumn()
@@ -28,23 +36,23 @@ export class InfoPersonal {
   last_name: string;
 
   @Column({ type: 'varchar', length: 20, nullable: true })
-  phone: string;
+  phone: string | null; // 🛑 FIX: เพิ่ม | null
 
   @Column({ type: 'date', nullable: true })
-  birth_date: Date;
+  birth_date: Date | null; // 🛑 FIX: เพิ่ม | null
 
   @Column({
     type: 'enum',
-    enum: ['male', 'female', 'other', 'not_specified'],
-    default: 'not_specified',
+    enum: Gender, // 🛑 FIX: ใช้ Enum ที่ export
+    default: Gender.NOT_SPECIFIED,
   })
-  gender: string;
+  gender: Gender; // 🛑 FIX: ใช้ Type เป็น Gender
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  profile_image: string; // เช่น jatuphon.png
+  profile_image: string | null; // 🛑 FIX: เพิ่ม | null
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  profile_image_mimetype: string; // เช่น image/png
+  profile_image_mimetype: string | null; // 🛑 FIX: เพิ่ม | null
 
   @CreateDateColumn({ type: 'datetime' })
   created_at: Date;

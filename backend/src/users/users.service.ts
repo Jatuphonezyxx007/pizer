@@ -39,7 +39,7 @@ export class UsersService {
         id: true,
         username: true,
         email: true,
-        is_active: true,
+        status: true, // 🛑 FIX: แก้จาก is_active เป็น status
         roles: {
           id: true,
           name: true,
@@ -69,17 +69,30 @@ export class UsersService {
     userId: number,
     updateProfileDto: UpdateProfileDto,
   ): Promise<InfoPersonal> {
+    // 🛑 หมายเหตุ: DTO นี้อนุญาตให้แก้ username/email
+    // ซึ่งอาจทับซ้อนกับ Admin Endpoint (PATCH /:id)
+    // และอาจต้องมีการตรวจสอบ unique constraint
+    const { username, email, ...infoData } = updateProfileDto;
+
+    // 1. อัปเดต User (ถ้ามี)
+    if (username || email) {
+      const user = await this.usersRepository.findOneBy({ id: userId });
+      if (!user) throw new NotFoundException('User not found');
+
+      if (username) user.username = username;
+      if (email) user.email = email;
+      // (ควรเพิ่ม try-catch สำหรับ unique constraint errors ที่นี่)
+      await this.usersRepository.save(user);
+    }
+
+    // 2. อัปเดต InfoPersonal
     const info = await this.infoPersonalRepository.findOne({
       where: { user_id: userId },
     });
-
     if (!info) {
       throw new NotFoundException('User profile not found');
     }
-
-    // อัปเดตเฉพาะ field ที่ส่งมา
-    Object.assign(info, updateProfileDto);
-
+    Object.assign(info, infoData);
     return this.infoPersonalRepository.save(info);
   }
 
@@ -142,7 +155,7 @@ export class UsersService {
     }
   }
 
-  // --- Service สำหรับ Admin (จัดการ User ทั้งหมด) ---
+  // --- Service สำหรับ Admin และ AuthService ---
 
   findAll() {
     return this.usersRepository.find({ relations: ['info_personal', 'roles'] });
@@ -160,20 +173,42 @@ export class UsersService {
   }
 
   async findByUsername(username: string): Promise<User | undefined> {
-    return this.usersRepository.findOne({
+    const user = await this.usersRepository.findOne({
       where: { username },
       relations: ['roles'],
     });
+    return user || undefined; // 🛑 FIX: แปลง null -> undefined
   }
 
   async findByEmail(email: string): Promise<User | undefined> {
-    return this.usersRepository.findOne({
+    const user = await this.usersRepository.findOne({
       where: { email },
       relations: ['roles'],
     });
+    return user || undefined; // 🛑 FIX: แปลง null -> undefined
+  }
+
+  // 🛑 FIX: เพิ่ม method สำหรับ AuthService
+  async findOneByIdentifier(identifier: string): Promise<User | undefined> {
+    // ตรวจสอบว่าเป็น Email หรือ Username
+    if (identifier.includes('@')) {
+      return this.findByEmail(identifier);
+    }
+    return this.findByUsername(identifier);
+  }
+
+  // 🛑 FIX: เพิ่ม method สำหรับ AuthService
+  async findOneByPhone(phone: string): Promise<User | undefined> {
+    const info = await this.infoPersonalRepository.findOne({
+      where: { phone: phone },
+      relations: ['user', 'user.roles'], // โหลด user และ roles มาด้วย
+    });
+    return info?.user || undefined;
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
+    // (หมายเหตุ: AuthService ควร hash password ก่อนเรียกใช้ method นี้)
+
     // 1. ตรวจสอบ Role
     const defaultRole = await this.rolesService.findByName('user');
     if (!defaultRole) {
@@ -184,36 +219,41 @@ export class UsersService {
     const user = this.usersRepository.create({
       username: createUserDto.username,
       email: createUserDto.email,
-      password: createUserDto.password, // (password จะถูก hash ใน pre-save hook ของ User entity)
+      password: createUserDto.password, // (password ที่ hash แล้วจาก AuthService)
       roles: [defaultRole],
+      // (status จะมี default 'active' จาก entity)
     });
     const savedUser = await this.usersRepository.save(user);
 
     // 3. สร้าง InfoPersonal
     const info = this.infoPersonalRepository.create({
       user_id: savedUser.id,
-      first_name: createUserDto.first_name,
-      last_name: createUserDto.last_name,
-      phone: createUserDto.phone || null,
+      // 🛑 FIX: ใช้ DTO.camelCase
+      first_name: createUserDto.firstName,
+      last_name: createUserDto.lastName,
+      phone: createUserDto.phone || null, // (Entity รับ null ได้แล้ว)
     });
     await this.infoPersonalRepository.save(info);
 
-    // ลบ password ก่อนส่งกลับ
-    delete savedUser.password;
+    // 🛑 FIX: ลบ 'delete' operator ออก, AuthService จะจัดการเอง
     return savedUser;
   }
 
   async update(id: number, updateUserDto: UpdateUserDto) {
     const user = await this.findOne(id); // (findOne มี check NotFound)
 
-    // (ยังไม่รองรับการอัปเดต password หรือ roles ผ่านทางนี้)
-    // (ควรรองรับการอัปเดต InfoPersonal และ Address แยก)
-
+    // 🛑 FIX: แก้ไข field ให้ตรง DTO และ Entity (is_active -> status)
     this.usersRepository.merge(user, {
       username: updateUserDto.username,
       email: updateUserDto.email,
-      is_active: updateUserDto.is_active,
+      status: updateUserDto.status, // (ใช้ status ที่เพิ่มใน DTO)
     });
+
+    // (Update password ไม่ได้ทำใน flow นี้)
+    if (updateUserDto.password) {
+      // (ถ้าจะทำ ต้อง hash password ใหม่)
+      // user.password = await bcrypt.hash(updateUserDto.password, 10);
+    }
 
     return this.usersRepository.save(user);
   }
