@@ -83,19 +83,19 @@ export class UsersService {
   async findOneByIdentifier(identifier: string): Promise<User | null> {
     let user = await this.usersRepository.findOne({
       where: { email: identifier },
-      relations: ['roles'],
+      relations: ['roles', 'info_personal'],
     });
     if (user) return user;
 
     user = await this.usersRepository.findOne({
       where: { username: identifier },
-      relations: ['roles'],
+      relations: ['roles', 'info_personal'],
     });
     if (user) return user;
 
     const info = await this.infoPersonalRepository.findOne({
       where: { phone: identifier },
-      relations: ['user', 'user.roles'],
+      relations: ['user', 'user.roles', 'user.info_personal'],
     });
 
     return info ? info.user : null;

@@ -2,6 +2,7 @@
 import { ref, computed } from "vue"; // ⭐️ 1. Import ref และ computed
 import { RouterLink, useRouter } from "vue-router";
 import { useAuthStore } from "../../stores/authStore"; // ⭐️ 1. Import Store
+import { getProfileImageUrl } from "../../utils/imageUrl";
 
 const authStore = useAuthStore(); // ⭐️ 2. เรียกใช้ Store
 const router = useRouter(); // ⭐️ 3. เรียกใช้ Router (สำหรับ Logout)
@@ -17,15 +18,10 @@ const isAdmin = computed(() => {
   );
 });
 
-// ⭐️ 1. สร้าง Computed Property สำหรับ URL รูปภาพ
-const backendUrl = "http://localhost:3000"; // URL ของ Backend
-const profilePictureUrl = computed(() => {
-  // ⭐️ 2. ตรวจสอบว่ามีข้อมูล user, info_personal และ profile_image หรือไม่
-  if (authStore.user?.info_personal?.profile_image) {
-    // ⭐️ 3. ประกอบร่าง URL ที่ถูกต้อง
-    return `${backendUrl}/assets/uploads/users/profiles/${authStore.user.info_personal.profile_image}`;
-  }
-  return null; // ถ้าไม่มี ให้คืนค่า null
+// ⭐️ 2. (เพิ่ม) Computed URL รูปภาพ
+const profileImageUrl = computed(() => {
+  const filename = authStore.user?.info_personal?.profile_image; //
+  return getProfileImageUrl(filename);
 });
 
 // ⭐️ 4. สร้างฟังก์ชัน Logout
@@ -55,18 +51,11 @@ const handleLogout = () => {
               @click="isDropdownOpen = !isDropdownOpen"
               class="flex items-center space-x-1 font-semibold hover:opacity-80"
             >
-              <template v-if="profilePictureUrl">
-                <img
-                  :src="profilePictureUrl"
-                  :alt="authStore.user.username"
-                  class="w-6 h-6 rounded-full object-cover border border-white/50"
-                />
-              </template>
-              <template v-else>
-                <span class="material-symbols-outlined text-xl">
-                  account_circle
-                </span>
-              </template>
+              <img
+                :src="profileImageUrl"
+                alt="profile"
+                class="w-5 h-5 rounded-full object-cover"
+              />
               <span>สวัสดี, {{ authStore.user.username }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"

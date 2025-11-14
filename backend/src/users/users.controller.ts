@@ -27,6 +27,7 @@ export class UsersController {
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   getProfile(@Request() req: any) {
+    // return this.usersService.getProfile(req.user.userId);
     return this.usersService.getProfile(req.user.userId);
   }
 
@@ -37,7 +38,8 @@ export class UsersController {
     @Request() req: any,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    return this.usersService.updateProfile(req.user.sub, updateProfileDto);
+    // return this.usersService.updateProfile(req.user.sub, updateProfileDto);
+    return this.usersService.updateProfile(req.user.userId, updateProfileDto);
   }
 
   // --- (Endpoints เดิมสำหรับ Admin) ---

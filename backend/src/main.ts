@@ -8,10 +8,10 @@ import { join } from 'path'; // ⭐️ 2. Import เพิ่ม
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // ⭐️ 4. เพิ่มบรรทัดนี้ (วางไว้ใกล้ๆ app.use(helmet()))
-  // นี่คือการบอกว่า "ถ้ามีการเรียก URL /assets ให้ไปหาไฟล์ในโฟลเดอร์ assets"
+  // ⭐️ 4. (เพิ่ม) อนุญาตให้เสิร์ฟไฟล์จากโฟลเดอร์ 'assets'
+  // นี่จะแมป URL http://localhost:3000/assets/ ไปยังโฟลเดอร์ backend/assets
   app.useStaticAssets(join(__dirname, '..', 'assets'), {
-    prefix: '/assets', // URL ที่จะใช้เข้าถึง: http://localhost:3000/assets/...
+    prefix: '/assets',
   });
 
   // 1. Security Headers
